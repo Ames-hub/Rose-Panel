@@ -1,0 +1,177 @@
+body {
+    background-color: gray;
+    overflow-x: hidden;
+}
+
+#server_list {
+    position: relative;
+    width: 100vw;
+    height: fit-content;
+    min-height: 96vh;
+    background-color: #33404d;
+    padding: 10px;
+    left: 0.5vw;
+}
+#server_list > div {
+    /* Lines up all the items on the Y Axis */
+    display: flex;
+    flex-direction: column;
+}
+#servers_footer {
+    font-size: 12px;
+    text-align: left;
+    
+    text-decoration: none;
+    --tw-text-opacity: 1;
+    color: hsla(211,12%,43%,var(--tw-text-opacity))
+}
+#serverfooter_container {
+    position: absolute;
+    bottom: 0px;
+}
+.server {
+    margin-bottom: 10px;
+    transition: background-color 0.3s;
+    background-color: #3f4d5a;
+    height: 70px;
+    cursor: pointer;
+}
+.server:hover {
+    background-color: #4f5d6a;
+}
+.server_svg {
+    width: 40px;
+    height: 40px;
+    margin: 15px;
+
+    /* Full credit to Pterodactyl Panel for the below SVG. */
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 512 512"><path d="M480 160H32c-17.673 0-32-14.327-32-32V64c0-17.673 14.327-32 32-32h448c17.673 0 32 14.327 32 32v64c0 17.673-14.327 32-32 32zm-48-88c-13.255 0-24 10.745-24 24s10.745 24 24 24 24-10.745 24-24-10.745-24-24-24zm-64 0c-13.255 0-24 10.745-24 24s10.745 24 24 24 24-10.745 24-24-10.745-24-24-24zm112 248H32c-17.673 0-32-14.327-32-32v-64c0-17.673 14.327-32 32-32h448c17.673 0 32 14.327 32 32v64c0 17.673-14.327 32-32 32zm-48-88c-13.255 0-24 10.745-24 24s10.745 24 24 24 24-10.745 24-24-10.745-24-24-24zm-64 0c-13.255 0-24 10.745-24 24s10.745 24 24 24 24-10.745 24-24-10.745-24-24-24zm112 248H32c-17.673 0-32-14.327-32-32v-64c0-17.673 14.327-32 32-32h448c17.673 0 32 14.327 32 32v64c0 17.673-14.327 32-32 32zm-48-88c-13.255 0-24 10.745-24 24s10.745 24 24 24 24-10.745 24-24-10.745-24-24-24zm-64 0c-13.255 0-24 10.745-24 24s10.745 24 24 24 24-10.745 24-24-10.745-24-24-24z" /></svg>');
+    background-repeat: no-repeat;
+    background-size: contain;
+}
+
+.server_title, .server_desc {
+    color: whitesmoke;
+}
+
+.server_title {
+    position: relative;
+    margin: 0%;
+    font-weight: bold;
+
+    left: 70px;
+    top: -59px;
+}
+.server_desc {
+    position: relative;
+    margin: 0%;
+
+    left: 70px;
+    top: -59px;
+    text-decoration: none;
+    --tw-text-opacity: 1;
+    color: hsla(211,13%,65%,var(--tw-text-opacity));
+}
+
+.resources {
+    position: relative;
+    top: -100px;
+    height: 70px;
+    left: 2vw;
+    margin: 0;
+}
+
+.server_cpu_used, .server_cpu_allowed {
+    position: relative;
+    /* I have no damn clue why, but adding a border makes the items line up. Don't remove. The more I study CSS the less I understand it*/
+    border: 1px solid rgba(0,0,0,0); 
+    left: 40vw;
+    top: -40px;
+    margin: 0;
+}
+.server_cpu_used {
+    text-decoration: none;
+    --tw-text-opacity: 1;
+    color: hsla(211,10%,63%,var(--tw-text-opacity));
+}
+.server_cpu_allowed {
+    text-decoration: none;
+    --tw-text-opacity: 1;
+    color: hsla(209,14%,42%,var(--tw-text-opacity));
+}
+
+.server_ram_used, .server_ram_total {
+    position: relative;
+    border: 1px solid rgba(0,0,0,0); 
+    left: 50vw;
+    margin: 0;
+}
+.server_ram_used {
+    text-decoration: none;
+    --tw-text-opacity: 1;
+    color: hsla(211,10%,63%,var(--tw-text-opacity));
+}
+.server_ram_total {
+    text-decoration: none;
+    --tw-text-opacity: 1;
+    color: hsla(209,14%,42%,var(--tw-text-opacity));
+}
+
+.server_disk_used, .server_disk_total {
+    position: relative;
+    border: 1px solid rgba(0,0,0,0);
+    left: 62vw;
+    top: -80px;
+    margin: 0;
+}
+.server_disk_used {
+    text-decoration: none;
+    --tw-text-opacity: 1;
+    color: hsla(211,10%,63%,var(--tw-text-opacity));
+}
+.server_disk_total {
+    text-decoration: none;
+    --tw-text-opacity: 1;
+    color: hsla(209,14%,42%,var(--tw-text-opacity));
+}
+
+#interact_box_container {
+    position: relative;
+    width: 100vw;
+    height: fit-content;
+    padding: 10px;
+    left: 0.5vw;
+    background-color: #33404d;    
+}
+#interaction_buttons_box {
+    position: relative;
+    height: 50px;
+    background-color: #45525e;
+    /* Lines up all the items on the X Axis */
+    display: flex;
+    flex-direction: row;
+}
+.interaction_btn {
+    position: relative;
+    cursor: pointer;
+    margin: 10px;
+}
+#new_server_button {
+    width: 60px;
+    background-color: #4be08c;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 25" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>');
+    background-repeat: no-repeat;
+    background-position: center;
+    border: none;
+    border-radius: 5px;
+}
+#view_other_servers_btn {
+    width: 20px;
+    top: 15px;
+}
+#view_all_btn_label {
+    position: relative;
+    left: -5px;
+    color: white;
+    top: 16px;
+}

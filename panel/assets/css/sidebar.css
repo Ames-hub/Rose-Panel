@@ -1,0 +1,86 @@
+/* In its own CSS file as sidebar is on all pages */
+body {
+    margin-left: 180px; /* Adjust this value based on your sidebar width */
+    transition: margin-left 0.5s; /* Optional: Add a smooth transition effect */
+}
+#sidebar {
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    width: 180px;
+    height: 100%;
+    background-color: #272727;
+    color: #e2e2e2;
+    border-right: 1px solid #ffffff;
+    overflow: auto;
+}
+#shrinked-sidebar {
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    width: 80px;
+    height: 100%;
+    background-color: #272727;
+    color: #e2e2e2;
+    border-right: 1px solid #ffffff;
+    overflow: auto;
+}
+
+#team_logo {
+    position: relative;
+    top: 10px;
+    width: 150px;
+    height: 150px;
+    /* Center the image */
+    margin-left: auto;
+    margin-right: auto;
+    display: block; /* Ensure it's a block-level element for centering to work. IF anyone removes this code, off with your head!!! */
+}
+
+#panel_title {
+    text-align: center;
+    font-size: large;
+    padding: 5px;
+}
+#nav {
+    display: block; /* Make each nav link a block-level element */
+    margin-top: 10px; /* Add some space between the links */
+}
+.nav-link {
+    display: block;
+    text-align: center; 
+    height: 60px;
+    background-color: #272727;
+    border-bottom: 1px solid #ffffff;
+    color: #e2e2e2;
+    /* Moves the text to the middle left */
+    line-height: 60px;
+    text-align: center;
+    padding-left: 50px;
+    font-size: 20px;
+}
+#status_detector {
+    /* Centres text */
+    position: relative;
+    left: 50%;
+    transform: translate(-50%, 0);
+
+    text-align: center;
+    background-color: gray; /*Gray by default, js changes it*/
+    max-width: fit-content;
+    padding-left: 5px;
+    padding-right: 5px;
+    border-radius: 20px;
+    margin-bottom: 15px;
+}
+#nav_index {
+    /* Add the SVGs */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='white' class='w-6 h-6'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 01-2.25 2.25M16.5 7.5V18a2.25 2.25 0 002.25 2.25M16.5 7.5V4.875c0-.621-.504-1.125-1.125-1.125H4.125C3.504 3.75 3 4.254 3 4.875V18a2.25 2.25 0 002.25 2.25h13.5M6 7.5h3v3H6v-3z' /%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 10px center;
+}
+#nav_servers {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='white' class='w-6 h-6'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M6.429 9.75L2.25 12l4.179 2.25m0-4.5l5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L21.75 12l-4.179 2.25m0 0l4.179 2.25L12 21.75 2.25 16.5l4.179-2.25m11.142 0l-5.571 3-5.571-3' /%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 10px center;
+}

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<head>
+    <title>Rose Panel</title>
+    <link rel="stylesheet" href="assets/css/servers.css">
+    <link rel="stylesheet" href="assets/css/sidebar.css">
+    <link rel="icon" href="assets/img/team_icon.png">
+</head>
+<body>
+    <sidebar id="sidebar">
+        <img src="assets/img/team_icon.png" alt="logo" id="team_logo">
+        <h1 id="panel_title">Interaction panel</h1>
+        <div id="status_detector">
+            <span id="status_text">Pending</span>
+        </div>
+        <hr>
+        <nav id="nav">
+            <!-- Makes all the tabs per <a> tag -->
+            <a id="nav_index" href="index.html" class="nav-link">Home</a>
+            <a id="nav_servers" href="servers.html" class="nav-link">Servers</a>
+        </nav>
+        <script src="assets/javascript/sidebar.js"></script>
+    </sidebar>
+
+    <div id="interact_box_container">
+        <div id="interaction_buttons_box">
+            <button id="new_server_button" class="interaction_btn"></button>
+            <input id="view_all_btn" type="checkbox" class="interaction_btn"> <label id="view_all_btn_label" for="view_all_btn">View All</label>
+        </div>
+    </div>
+    <div id="server_list">
+        <div id="server_list_container"></div>
+        <div id="serverfooter_container">
+            <p id="servers_footer">Rose Panel | 2024</p>
+        </div>
+    </div>
+    <script src="assets/javascript/list_servers.js"></script>
+    <script src="assets/javascript/server_alive_check.js"></script>
+    <script src="assets/javascript/validate_token.js"></script>
+</body>
