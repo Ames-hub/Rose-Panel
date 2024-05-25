@@ -177,6 +177,7 @@ class rose:
                         print(f"{colours['red']}Critical Error: {err}.{colours['reset']}")
                         print(f"Does account '{root_user.get('email_address', 'Undefined')}' exist with a valid password?")
                         continue
+
                     if args[0] == 'create':
                         def is_number(x):
                             try:
@@ -245,7 +246,11 @@ class rose:
 
                         run_success = True
                     elif args[0] == 'delete':
-                        # TODO: Implement this
+
+                        identifier = rose.ask_question("Enter the name of the server you wish to delete.", filter_func=lambda x: x != '' and x is not None)
+
+                        root_user.delete_server(identifier)
+
                         print("Delete server is not implemented yet.")
                         run_success = True
                     elif args[0] == 'list':
@@ -287,7 +292,7 @@ class rose:
                                 else:
                                     print("Invalid server ID. Please try again.")
 
-                            root_user.stop_server(server_id=target_server)
+                            root_user.stop_server(name_id=target_server)
                     elif args[0] == 'start':
                         while True:
                             print("Please enter the server you wish to start. (Case sensitive)")
@@ -312,7 +317,7 @@ class rose:
                                 else:
                                     print("Invalid server ID. Please try again.")
 
-                            root_user.start_server(server_id=target_server)
+                            root_user.start_server(name_id=target_server)
 
                 elif cmd == 'sessions':
                     if len(args) == 0:

@@ -85,6 +85,31 @@ class thorns:
         else:
             return 'name'
 
+    def get_idtype_target(identifier:str, target_type:str):
+        '''
+        This function returns the type of the identifier specified for that server.
+        So if you provide a SUID with the target type being suid, it will return the SUID.
+        If you provide a SUID with the target type being name, it will return the name id.
+        and vice versa.
+
+        :param identifier: The identifier of the server.
+        :param target_type: The type you want to get. (suid or name)
+        :return:
+        '''
+        assert target_type in ['suid', 'name'], "target_type must be either 'suid' or 'name'."
+        if target_type == 'suid':
+            if identifier.startswith('thorn_'):
+                return identifier
+            else:
+                return thorns.get_opposite_id(name_id=identifier)
+        elif target_type == 'name':
+            if not identifier.startswith('thorn_'):
+                return identifier
+            else:
+                return thorns.get_opposite_id(suid=identifier)
+        else:
+            raise ValueError("target_type must be either 'suid' or 'name'.")
+
     # TODO: Fix and ensure this works. Don't know if command can be sent to the process.
     def worker(init_cmd, cmd_queue:multiprocessing.Queue, output_queue:multiprocessing.Queue, identifier) -> str:
         '''
@@ -141,10 +166,10 @@ class thorns:
 
         return rc # Return code.
 
-    def create(identifier,
-               description,
-               owner_email,
-               init_cmd,
+    def create(identifier:str,
+               description:str,
+               owner_email:str,
+               init_cmd:str,
                install_cmds:list,
                kill_signal,
                port=None,
@@ -181,6 +206,9 @@ class thorns:
 
         if thorns.check_exists(name_id=identifier) is True:
             raise thorns.errors.ServerExists(f"Server with the name '{identifier}' already exists.")
+
+        assert isinstance(install_cmds, list), "install_cmds is not a list."
+        assert not identifier.startswith('thorn_'), "the name id cannot start with 'thorn_'"
 
         # Creates the server data's template
         server = dt.SERVER_INSTANCE
@@ -242,12 +270,13 @@ class thorns:
 
         if thorns.check_exists(name_id=identifier) is False:
             raise thorns.errors.ServerDoesNotExist(f"Server '{identifier}' does not exist.")
-        suid = thorns.get_opposite_id(name_id=identifier)
+        suid = thorns.get_idtype_target(identifier, 'suid')
 
         # Deletes the server
         os.system(f"rm -rf servers/{suid}")
 
         logging.info(f"User '{senders_email}' deleted the server '{identifier}'.")
+        return True
 
     def start(identifier, senders_email:str):
         thorns.validate_data(thorns.compile_data_from_func())
@@ -315,7 +344,10 @@ class thorns:
         else:
             # If it does not break here, then the process is still alive and goes to 'else'
             # Probs wont work, but its worth a shot.
-            thorns.find_process(suid).kill()
+            try:
+                thorns.find_process(suid).kill()
+            except Exception as err:
+                logging.error(f"Something went wrong stopping {suid}.", exception=err)
 
         # Stop the server
         server['online'] = False
@@ -327,11 +359,14 @@ class thorns:
         var.set(key='process_pid', value=None, file=f'servers/{suid}/config.json', dt_default=dt.SERVER_INSTANCE)
         var.set(key='online', value=False, file=f'servers/{suid}/config.json', dt_default=dt.SERVER_INSTANCE)
 
+        return True
+
     def find_process(name) -> multiprocessing.Process:
         # Returns the MP Child with the name
         for child in multiprocessing.active_children():
             if child.name == name:
                 return child
+        return None
 
 if __name__ == "__main__":
     print("This file cannot be ran directly. Please import it.")

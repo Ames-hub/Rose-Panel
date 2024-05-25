@@ -414,8 +414,14 @@ class security:
                 port=port
             )
 
-        def start_server(self, server_id):
-            thorns.start(server_id, self.email_address)
+        def delete_server(self, name_id:str):
+            suid = thorns.get_idtype_target(name_id, 'suid')
+            return thorns.delete(suid, self.email_address)
 
-        def stop_server(self, server_id):
-            thorns.stop(server_id, self.email_address)
+        def start_server(self, name_id):
+            suid = thorns.get_idtype_target(name_id, 'suid')
+            thorns.start(suid, self.email_address)
+
+        def stop_server(self, name_id):
+            suid = thorns.get_idtype_target(name_id, 'suid')
+            thorns.stop(suid, self.email_address)
