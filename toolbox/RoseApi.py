@@ -1,5 +1,6 @@
-from toolbox.security import security
+from toolbox.permissions import permissions
 from quart import request as quart_request
+from toolbox.accounts import user_account
 from toolbox.pylog import pylog, logman
 from toolbox.errors import error
 from toolbox.storage import var
@@ -9,45 +10,6 @@ import datetime
 import uvicorn
 import quart
 import os
-
-# TODO: Fix.
-def token_required(function):
-    '''
-    A Decorator for API funcs that makes sure the token is provided and valid.
-    Also provides the user object to the function.
-    '''
-    async def wrapper(*args, **kwargs):
-        data = await quart_request.get_json()
-
-        # Check if the token is provided.
-        token = data.get('token', None)
-        if token is None:
-            return {
-                'message': 'Token not provided.'
-            }, 401
-
-        # Check if the token is valid.
-        try:
-            user = security.account(token=token, is_registering=False)
-        except error.InvalidToken:
-            return {
-                'message': 'Invalid token.'
-            }, 401
-        except error.AccountNotFound:
-            return {
-                'message': 'Account not found.'
-            }, 401
-        except Exception as err:  # Catches all other errors.
-            logging.error(f"Something went wrong! Error: {err}", exception=err)
-            return {
-                'message': 'something went wrong!'
-            }, 401
-
-        # Pass the user object to the function
-        return await function(user, *args, **kwargs)
-
-    wrapper.__name__ = function.__name__
-    return wrapper
 
 # The directory of the project.
 project_dir = os.path.abspath(os.getcwd()) if __name__ == "__main__" else os.path.abspath(os.path.join(os.getcwd(), '..'))
@@ -102,15 +64,30 @@ class error_handlers:
         }, 400
 
     @app.errorhandler(error.InsufficientPermissions)
-    def insuf_perms(err):
+    def insuf_perms(err: error.InsufficientPermissions):
+        needed_permissions = permissions.get_name(err.permission)
+        needed_permissions_str = ", ".join(needed_permissions)
         return {
-            'message': 'Insufficient permissions.',
+            'message': f'Insufficient permissions. You are missing \"{needed_permissions_str}\"',
+            'needed_perms': needed_permissions
         }, 401
 
+    @app.errorhandler(AssertionError)
+    def assert_err(err):
+        return {
+            'message': str(err)
+        }, 400
+
+shared_dict = None
+
 class rose_api:
-    def run(use_ssl=False, silence=True):
+    def run(shared, use_ssl=False, silence=True):
         '''
         Call this function in a MP process to start the API.
+
+        :param shared: This is a shared dict from MP manager.
+        :param use_ssl: Whether or not to use SSL.
+        :param silence: Whether or not to silence uvicorn logs from the console.
         '''
         logging.info(f"Starting the RosePanel API on {host_name}:{port_number}.")
 
@@ -118,6 +95,9 @@ class rose_api:
         if silence:
             logging.info("Silencing uvicorn logs.")
             uvicorn.config.LOGGING_CONFIG = logging
+
+        global shared_dict
+        shared_dict = shared
 
         if use_ssl:
             # Serve the app with SSL
@@ -153,7 +133,7 @@ class rose_api:
             }, 400
 
         try:
-            user = security.account(token=token, is_registering=False)
+            user = user_account(token=token, is_registering=False)
         except:
             return 'bad', 401
 
@@ -182,7 +162,7 @@ class rose_api:
 
         # This also handles registration and login
         try:
-            user = security.account(email_address=email_address, password=password, is_registering=is_registering)
+            user = user_account(email_address=email_address, password=password, is_registering=is_registering)
         except (error.InvalidCredentials, error.AccountNotFound, error.AccountAlreadyExists) as err:
             return {
                 'message': str(err)
@@ -199,9 +179,11 @@ class rose_api:
     async def list_servers():
         data = await quart_request.get_json()
         token = data.get('token', None)
+        own_servers_only = data.get('own_servers_only', True)
+        assert own_servers_only in [True, False], "own_servers_only must be a boolean."
 
-        user = security.account(token=token)
-        servers = user.list_servers(own_servers_only=True)  # Await the async operation here
+        user = user_account(token=token)
+        servers = user.list_servers(own_servers_only=own_servers_only)  # Await the async operation here
         return {
             'servers': servers
         }, 200
@@ -211,7 +193,7 @@ class rose_api:
         data = await quart_request.get_json()
         token = data.get('token', None)
 
-        user = security.account(token=token)
+        user = user_account(token=token)
         user.create_server(
             identifier=data.get('identifier', None),
             description=data.get('description', None),
@@ -230,7 +212,7 @@ class rose_api:
         data = await quart_request.get_json()
         token = data.get('token', None)
 
-        user = security.account(token=token)
+        user = user_account(token=token)
         return {
             'permissions': user.permissions
         }, 200

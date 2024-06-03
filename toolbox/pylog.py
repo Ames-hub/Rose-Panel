@@ -1,7 +1,6 @@
 # Pylog is a Custom Logging Library for PyHost (specifically) but can be used for any python project.
 # It is built for when multiple files/functions need to log to the same file at the same time. Standard logging library poorly handles this.
 # Pylog is built to be threading safe and multiprocessing safe and handle the stress.
-import multiprocessing
 import traceback
 import datetime
 import inspect
@@ -10,7 +9,7 @@ import time
 import sys
 import os
 
-datetime_str = '%Y-%m-%d, %I.%m %p'
+datetime_str = '%Y-%m-%d, %I.%M %p'
 global_cachedir = os.path.join(os.getcwd(), "logs/.cache/")
 
 cacheitem_data_table = {
@@ -297,23 +296,6 @@ class pylog:
 def logman():
     cachedir = global_cachedir
 
-    def chunk_searcher(chunk, search_for):
-        '''
-        Chunk searcher is an untested function.
-        It is supposed to speed-up the search for a string in a LARGE list of strings.
-
-        :param chunk:
-        :param search_for:
-        :return:
-        '''
-        try:
-            if search_for in chunk:
-                return True
-            else:
-                return False
-        except KeyboardInterrupt:
-            return -1
-
     def writer():
         queue = logQueue(cachedir)
         if not queue.is_empty(queue_type="priority"):
@@ -333,37 +315,9 @@ def logman():
             err_log_msg = f'I encountered an error while logging the following message\n\"{log["msg"]}\"\nMy Error: {err}\n{err_formatted}'
             with open('pylog_error.log', 'r+') as f:
                 content = f.read()
-            if len(content) < 200_000:
-                if err_log_msg not in content:
-                    with open('pylog_error.log', 'a+') as f:
-                        f.write(err_log_msg)
-            else:
-                threads = []
-                content = content.splitlines()
-                for i in range(3):
-                    chunk = content[i * 1000: (i + 1) * 1000]
-                    thread = multiprocessing.Process(
-                        target=chunk_searcher,
-                        args=(chunk, err_log_msg)
-                    )
-                    threads.append(thread)
-
-                for thread in threads:
-                    thread: multiprocessing.Process
-                    thread.start()
-
-                for thread in threads:
-                    if thread.is_alive():
-                        thread.join()
-
-                    result = thread.exitcode
-                    if result is True:
-                        break
-                    elif result == -1:
-                        return True
-                else:
-                    with open('pylog_error.log', 'a+') as f:
-                        f.write(err_log_msg)
+            if err_log_msg not in content:
+                with open('pylog_error.log', 'a+') as f:
+                    f.write(err_log_msg)
     try:
         while True:
             writer()

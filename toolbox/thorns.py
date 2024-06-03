@@ -4,12 +4,15 @@ import multiprocessing
 import subprocess
 import inspect
 import random
+import shutil
+import signal
 import shlex
 import os
 
 logging = pylog('logs/rose_%TIMENOW%.log')
 os.makedirs('servers', exist_ok=True)
 
+DEBUG = os.environ.get('DEBUG', False)
 maximum_args = 4
 
 class thorns:
@@ -79,13 +82,13 @@ class thorns:
         data = {k: v for k, v in arg_info.locals.items() if k in arg_info.args}
         return data
 
-    def get_id_type(identifier:str):
+    def get_id_type(identifier:str) -> str:
         if identifier.startswith('thorn_'):
             return 'suid'
         else:
             return 'name'
 
-    def get_idtype_target(identifier:str, target_type:str):
+    def get_idtype_target(identifier:str, target_type:str) -> str:
         '''
         This function returns the type of the identifier specified for that server.
         So if you provide a SUID with the target type being suid, it will return the SUID.
@@ -96,6 +99,7 @@ class thorns:
         :param target_type: The type you want to get. (suid or name)
         :return:
         '''
+        assert type(identifier) is str, f'identifier must be a string. Not {identifier} {type(identifier)}'
         assert target_type in ['suid', 'name'], "target_type must be either 'suid' or 'name'."
         if target_type == 'suid':
             if identifier.startswith('thorn_'):
@@ -110,61 +114,52 @@ class thorns:
         else:
             raise ValueError("target_type must be either 'suid' or 'name'.")
 
-    # TODO: Fix and ensure this works. Don't know if command can be sent to the process.
-    def worker(init_cmd, cmd_queue:multiprocessing.Queue, output_queue:multiprocessing.Queue, identifier) -> str:
+    # TODO: Fix this function. Figure out why the subprocess.Popen never starts the process.
+    def worker(identifier, input_pipe: multiprocessing.Pipe, DEBUG=False) -> bool:
         '''
         This function is used to run a command in a separate process in a certain directory. AKA The backbone of Thorns.
+        Writes to a file in server/identifier/stdout which is text-based. This is used to read the output of the server.
 
-        :param init_cmd: The command to run.
-        :param cmd_queue: The queue to put new commands in.
-        :param output_queue: The queue to put the output in.
         :param identifier: The identifier of the server.
-        :return rc: The return code of the process.
-        :return process: The process object.
+        :param input_pipe: The pipe to send input to the subprocess.
+        :param DEBUG: Whether to run in debug mode or not.
+        :return bool: True if the server was started successfully, False if it was not.
         '''
-        if thorns.get_id_type(identifier) == 'name':
-            identifier = thorns.get_opposite_id(name_id=identifier)
-        os.chdir(var.get('content_dir', file=f'servers/{identifier}/config.json', dt_default=dt.SERVER_INSTANCE))
+        identifier = thorns.get_idtype_target(identifier, 'suid')
+        content_dir = var.get('content_dir', file=f'servers/{identifier}/config.json', dt_default=dt.SERVER_INSTANCE)
+        project_wd = var.get('working_directory')
+        project_wd = os.path.abspath(project_wd)
+
+        server_file = os.path.join(project_wd, f'servers/{identifier}/config.json')
+        # Loads the init command from the server file and splits it into a list.
+        init_cmd = str(dict(var.load_all(file=server_file, dt_default=dt.SERVER_INSTANCE))['init_cmd']).split(" ")
+
+        if DEBUG is True:
+            logging.debug(f'Running command: {init_cmd}')
+            logging.debug(f'Working directory: {os.getcwd()}')
+            logging.debug(f'Content directory: {content_dir}')
+            logging.debug(f'Server file: {server_file}')
+            logging.debug(f'Project working directory: {project_wd}')
+
         process = subprocess.Popen(
-            shlex.split(init_cmd),
-            stdin=subprocess.PIPE,  # Allow writing to the subprocess
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            args=init_cmd,
+            start_new_session=True,
+            cwd=project_wd,
         )
-        var.set('process_pid', process.pid, file=f'servers/{identifier}/config.json', dt_default=dt.SERVER_INSTANCE)
 
-        while True:
-            output = process.stdout.readline()
-            # If the output is empty and the process has finished, break the loop.
-            if process.poll() is not None: # If its not None, then its a return code. Indicating it has finished.
-                break
+        var.set(key='process_pid', value=process.pid, file=server_file, dt_default=dt.SERVER_INSTANCE)
+        var.set(key='online', value=True, file=server_file, dt_default=dt.SERVER_INSTANCE)
 
-            # If the output is not empty, put it in the queue.
-            if output:
-                output_queue.put(output.strip())
+        if DEBUG is True:
+            if process.pid is not None:
+                logging.debug(f'Server {identifier} started successfully.')
+            else:
+                logging.debug(f'Server {identifier} did not start successfully.')
 
-            # Sends the command to the process if the queue for commands is not empty.
-            if not cmd_queue.empty():
-                cmd = cmd_queue.get()
-                if cmd is not str:
-                    continue
-                process.stdin.write(cmd + b'\n')
-                process.stdin.flush()
-        rc = process.poll()
-
-        # Sets the server to offline and PID to None since the process is dead. (or should be)
-        var.set('online', False, file=f'servers/{identifier}/config.json', dt_default=dt.SERVER_INSTANCE)
-
-        # Tries to stop it, just incase it didn't die for some reason. prevents 'rogue programs'
-        process_pid = var.get('process_pid', file=f'servers/{identifier}/config.json', dt_default=dt.SERVER_INSTANCE)
-        try:
-            thorns.stop(identifier, f'thorns.worker.{identifier}')
-        except:
-            pass
-        var.set('process_pid', None, file=f'servers/{identifier}/config.json', dt_default=dt.SERVER_INSTANCE)
-        var.set('worker_pid', None, file=f'servers/{identifier}/config.json', dt_default=dt.SERVER_INSTANCE)
-
-        return rc # Return code.
+        # Ends the process
+        var.set(key='process_pid', value=None, file=server_file, dt_default=dt.SERVER_INSTANCE)
+        var.set(key='online', value=False, file=server_file, dt_default=dt.SERVER_INSTANCE)
+        return True
 
     def create(identifier:str,
                description:str,
@@ -180,7 +175,7 @@ class thorns:
 
         :param description: The description of the server.
         :param owner_email: The email of the person trying to make the server.
-        :param init_cmd: The command to run to start the server. (such as "python3 main.py -O")
+        :param init_cmd: The command to run to start the server. (such as "python3 test.py -O")
         :param install_cmds: A list of all commands needed to install the server.
         :param kill_signal: The signal to send to the server to kill it. (such as 2, 15, 9 or 'stop')
         :param port: The port the server will run on.
@@ -207,13 +202,13 @@ class thorns:
         if thorns.check_exists(name_id=identifier) is True:
             raise thorns.errors.ServerExists(f"Server with the name '{identifier}' already exists.")
 
-        assert isinstance(install_cmds, list), "install_cmds is not a list."
         assert not identifier.startswith('thorn_'), "the name id cannot start with 'thorn_'"
 
         # Creates the server data's template
         server = dt.SERVER_INSTANCE
         server['owner'] = owner_email
         server['identifier'] = identifier
+        server['server_unique_id'] = ServerUniqueID
         server['description'] = description
         server['hostname'] = hostname
         server['port'] = port
@@ -261,11 +256,13 @@ class thorns:
                     message=f"An error occurred while installing the server '{identifier}'.",
                     exception=err
                 )
+                # Returns the error and the index of the command that failed.
                 return {'success':False, 'error':err, 'list_index': index_place}
 
+        logging.info(f"Server '{identifier}' was created successfully.")
         return True
 
-    def delete(identifier:str, senders_email:str):
+    def delete(identifier:str, senders_email:str) -> bool:
         thorns.validate_data(thorns.compile_data_from_func())
 
         if thorns.check_exists(name_id=identifier) is False:
@@ -273,39 +270,31 @@ class thorns:
         suid = thorns.get_idtype_target(identifier, 'suid')
 
         # Deletes the server
-        os.system(f"rm -rf servers/{suid}")
+        shutil.rmtree(f'servers/{suid}')
 
         logging.info(f"User '{senders_email}' deleted the server '{identifier}'.")
         return True
 
-    def start(identifier, senders_email:str):
-        thorns.validate_data(thorns.compile_data_from_func())
-
-        if thorns.check_exists(name_id=identifier) is False:
+    def start(identifier, senders_email:str) -> multiprocessing.Queue:
+        identifier = thorns.get_idtype_target(identifier, 'suid')
+        if thorns.check_exists(suid=identifier) is False:
             raise thorns.errors.ServerDoesNotExist(f"Server '{identifier}' does not exist.")
-        suid = thorns.get_opposite_id(name_id=identifier)
 
-        server = dict(var.load_all(file=f'servers/{suid}/config.json', dt_default=dt.SERVER_INSTANCE))
-
-        # Create a Queue for communication
-        cmd_queue = multiprocessing.Queue()
-        output_queue = multiprocessing.Queue()
+        input_pipe = multiprocessing.Pipe()
 
         # Start the server
+        assert identifier is not None, 'suid is None.'
         process = multiprocessing.Process(
-            name=suid, target=thorns.worker, args=(server['init_cmd'], cmd_queue, output_queue)
+            target=thorns.worker,
+            args=(identifier, input_pipe, DEBUG),
+            name=identifier
         )
         process.start()
-        server['online'] = True
-        server['worker_pid'] = process.pid
 
-        # Update the config file
-        var.set(key='worker_pid', value=process.pid, file=f'servers/{identifier}/config.json', dt_default=dt.SERVER_INSTANCE)
-        var.set(key='online', value=True, file=f'servers/{identifier}/config.json', dt_default=dt.SERVER_INSTANCE)
+        logging.info(f"User '{senders_email}' started the server '{identifier}'{' in debug mode' if DEBUG else ''}.")
+        return input_pipe
 
-        return True
-
-    def stop(identifier:str, senders_email:str):
+    def stop(identifier:str, senders_email:str) -> bool:
         thorns.validate_data(thorns.compile_data_from_func())
 
         if thorns.check_exists(name_id=identifier) is False:
@@ -318,55 +307,26 @@ class thorns:
         server = dict(var.load_all(file=f'servers/{suid}/config.json', dt_default=dt.SERVER_INSTANCE))
         saved_code = server['kill_signal']
 
-        worker_pid = server['worker_pid']
-        mp_process_pid = server['process_pid']
-        for killcode in [saved_code, 15, 9]:
-            try:
-                os.kill(worker_pid, killcode)
-                # Checks if its dead
-                if os.waitpid(worker_pid, os.WNOHANG) == (0, 0):
-                    break
-            except Exception as err:
-                if os.waitpid(worker_pid, os.WNOHANG) == (0, 0):
-                    break
-                logging.error(f"Something went wrong stopping {suid}.", exception=err)
+        subprocess_pid = server['process_pid']
 
-        for killcode in [2, 15, 9]:
+        for killcode in [saved_code, signal.SIGINT, signal.SIGTERM, signal.SIGKILL]:
             try:
-                os.kill(mp_process_pid, killcode)
+                os.kill(subprocess_pid, killcode)
                 # Checks if its dead
-                if os.waitpid(mp_process_pid, os.WNOHANG) == (0, 0):
-                    break
-            except Exception as err:
-                if os.waitpid(mp_process_pid, os.WNOHANG) == (0, 0):
-                    break
-                logging.error(f"Something went wrong stopping {suid}.", exception=err)
-        else:
-            # If it does not break here, then the process is still alive and goes to 'else'
-            # Probs wont work, but its worth a shot.
-            try:
-                thorns.find_process(suid).kill()
+                # TODO: Find reliable way to check if the process is dead.
             except Exception as err:
                 logging.error(f"Something went wrong stopping {suid}.", exception=err)
 
         # Stop the server
         server['online'] = False
-        server['worker_pid'] = None
         server['process_pid'] = None
 
         # Update the config file
-        var.set(key='worker_pid', value=None, file=f'servers/{suid}/config.json', dt_default=dt.SERVER_INSTANCE)
         var.set(key='process_pid', value=None, file=f'servers/{suid}/config.json', dt_default=dt.SERVER_INSTANCE)
         var.set(key='online', value=False, file=f'servers/{suid}/config.json', dt_default=dt.SERVER_INSTANCE)
 
+        logging.info(f"User '{senders_email}' stopped the server '{identifier}'.")
         return True
-
-    def find_process(name) -> multiprocessing.Process:
-        # Returns the MP Child with the name
-        for child in multiprocessing.active_children():
-            if child.name == name:
-                return child
-        return None
 
 if __name__ == "__main__":
     print("This file cannot be ran directly. Please import it.")

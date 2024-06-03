@@ -33,6 +33,7 @@ body {
     margin-bottom: 10px;
     transition: background-color 0.3s;
     background-color: #3f4d5a;
+    min-height: fit-content;
     height: 70px;
     cursor: pointer;
 }

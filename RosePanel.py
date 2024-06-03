@@ -1,8 +1,9 @@
+from toolbox.permissions import permissions as perms
 from toolbox.storage import var, settings_path, dt
+from toolbox.accounts import user_account
 from toolbox.pylog import pylog, logman
 from toolbox.webserver import webserver
 from difflib import get_close_matches
-from toolbox.security import security
 from toolbox.RoseApi import rose_api
 from toolbox.thorns import thorns
 from toolbox.errors import error
@@ -43,7 +44,6 @@ cmds_dict = {
         'msg': "Manage active sessions.",
         'args': ['list'],
     },
-    # TODO: Implement delete arg
     "server": {
         'msg': "Manage and interact with servers.",
         'args': ['create', 'delete', 'list', 'start', 'stop'],
@@ -79,6 +79,8 @@ class rose:
             run_success = False
             # Captures current terminal text and puts it in a variable
             rose.clear_terminal()
+            if DEBUG is True:
+                print("NOTICE: RosePanel is in Debug Mode")
 
             while True:
                 if not executing_similar[0]:
@@ -167,9 +169,10 @@ class rose:
                         print('- server create\n- server delete\n- server list\n- server start\n- server stop\n- server restart')
                         run_success = True
 
-                    root_user = dict(var.get(f'accounts//{var.get("root_email")}'))
+                    root_email = var.get("root_email")
+                    root_user = dict(var.get(f'accounts//{root_email}'))
                     try:
-                        root_user = security.account(
+                        root_user = user_account(
                             email_address=root_user.get('email_address', None),
                             password=root_user.get('password', None)
                         )
@@ -188,13 +191,37 @@ class rose:
 
                         if DEBUG is False:
                             try:
-                                identifier = rose.ask_question("What do you want to name the server?", filter_func=lambda x: x != '' and x is not None)
-                                description = rose.ask_question("How would you describe the server?", filter_func=lambda x: x != '' and x is not None)
-                                init_cmd = rose.ask_question("Enter the command to start the server.", filter_func=lambda x: x != '' and x is not None)
-                                install_cmds = rose.ask_question("Enter the commands to install the server.", filter_func=lambda x: x != '' and x is not None,do_listing=True)
-                                kill_signal = rose.ask_question("Enter the kill signal for the server.", filter_func=lambda x: x != '' and x is not None)
-                                hostname = rose.ask_question("Enter the hostname.", default='0.0.0.0', filter_func=lambda x: x != '' and x is not None)
-                                if rose.ask_question("Do you need a port opened? (y/*n)", filter_func=lambda x: x in ['y', 'yes']) in ['y', 'yes']:
+                                identifier = rose.ask_question(
+                                    "What do you want to name the server?",
+                                    filter_func=lambda x: x != '' and x is not None,
+                                    show_default=False, allow_default=False, confirm_validity=False
+                                )
+                                description = rose.ask_question(
+                                    "How would you describe the server?",
+                                    filter_func=lambda x: x != '' and x is not None,
+                                    show_default=False, default='A RosePanel server.',
+                                    confirm_validity=False
+                                )
+                                init_cmd = rose.ask_question(
+                                    "Enter the command to start the server.",
+                                    filter_func=lambda x: x != '' and x is not None,
+                                    confirm_validity=False, default='python3 test.py -O'
+                                )
+                                # Entering test data for debugging
+                                install_cmds = rose.ask_question(
+                                    "Enter the commands to install the server.",
+                                    filter_func=lambda x: x != '' and x is not None, do_listing=True
+                                )
+                                kill_signal = rose.ask_question(
+                                    "Enter the kill signal for the server.",
+                                    filter_func=lambda x: x != '' and x is not None,
+                                    default=9, confirm_validity=True
+                                )
+                                hostname = rose.ask_question(
+                                    "Enter the hostname.",
+                                    default='0.0.0.0', filter_func=lambda x: x != '' and x is not None
+                                )
+                                if rose.ask_question("Do you need a port opened? (y/*n)", filter_func=lambda x: x in ['y', 'yes', 'n', 'no']) in ['y', 'yes']:
                                     port = rose.ask_question("Enter the port number.", filter_func=is_number, default=random.randint(1000, 9999))
                                 else:
                                     print("Going portless mode for this server.")
@@ -204,18 +231,11 @@ class rose:
                                 continue
                         else:
                             # Sets test data
-                            identifier = "test MC server"
-                            description = "A test MC Server"  # Minecraft vanilla server
-                            init_cmd = f"java -Xmx1024M -Xms1024M -jar minecraft_server.1.8.9.jar nogui"  # 1024mb ram
-                            if os.name != 'nt':
-                                # Installs 1.8.9 MC Server
-                                install_cmds = [
-                                    'wget https://launcher.mojang.com/v1/objects/b58b2ceb36e01bcd8dbf49c8fb66c55a9f0676cd/server.jar -O minecraft_server.1.8.9.jar']
-                            else:
-                                # Installs 1.8.9 MC Server. Uses curl for windows
-                                install_cmds = [
-                                    'curl -o minecraft_server.1.8.9.jar https://launcher.mojang.com/v1/objects/901f0b2b1ab24e4fa4970b6e03e8acb5b8e5ac9d/server.jar']
-                            kill_signal = 'exit'
+                            identifier = "test server"
+                            description = "A test server"
+                            init_cmd = f"python3 test.py -O"
+                            install_cmds = [] # None
+                            kill_signal = 2
                             hostname = "0.0.0.0"  # All interfaces
                             if rose.ask_question("Do you need a port opened? (y/*n)") in ['y', 'yes']:
                                 port = random.randint(1000, 9999)
@@ -247,11 +267,33 @@ class rose:
                         run_success = True
                     elif args[0] == 'delete':
 
-                        identifier = rose.ask_question("Enter the name of the server you wish to delete.", filter_func=lambda x: x != '' and x is not None)
+                        servers = root_user.list_servers()
+                        if len(servers) == 0:
+                            print(f"{colours['yellow']}No servers found. Please create a server first using 'server create'{colours['reset']}")
+                            run_success = True
+                            continue
+                        else:
+                            print("Servers found:")
+                            server_id = 0
+                            valid_servers = {}
+                            for server in servers:
+                                server_id += 1
+                                # Gives a SUID for the ID
+                                valid_servers[server_id] = server
+                                print(f'{server_id} - {thorns.get_opposite_id(suid=server)}')
+                            identifier = rose.ask_question(
+                                "Enter the name or ID of the server you wish to delete. (Case Sensitive)",
+                                filter_func=lambda x: x != '' and x is not None,
+                                show_default=False,
+                                confirm_validity=True
+                            )
+                            if identifier in valid_servers.keys():
+                                identifier = valid_servers[identifier]
+                            elif identifier in valid_servers.values():
+                                pass
 
                         root_user.delete_server(identifier)
-
-                        print("Delete server is not implemented yet.")
+                        print(f"{colours['green']}Server deleted successfully.{colours['reset']}")
                         run_success = True
                     elif args[0] == 'list':
                         print("Listing servers...")
@@ -295,30 +337,40 @@ class rose:
                             root_user.stop_server(name_id=target_server)
                     elif args[0] == 'start':
                         while True:
-                            print("Please enter the server you wish to start. (Case sensitive)")
                             count = 0
                             users_servers = root_user.list_servers()
                             number_server_crossref = {}
-                            valid_server_ids = []
-                            for server in users_servers:
-                                count += 1
-                                server_id = thorns.get_opposite_id(server)
-                                valid_server_ids.append(server_id)
-                                number_server_crossref[count] = server_id
-                                print(f"ID {count}: {server_id}")
 
-                            # TODO: Fix this not starting servers
-                            while True:
+                            if len(users_servers) != 0:
+                                print("Please enter the server you wish to start. (Case sensitive)")
+                                for server in users_servers:
+                                    count += 1
+                                    server_id = thorns.get_idtype_target(server, 'name')
+                                    number_server_crossref[count] = server_id
+                                    print(f"ID {count}: {server_id}")
+
                                 target_server = rose.ask_question("Enter the server ID to start.")
-                                if target_server in number_server_crossref.keys():
-                                    break
-                                elif target_server in valid_server_ids:
-                                    break
-                                else:
-                                    print("Invalid server ID. Please try again.")
+                                if target_server.isnumeric():
+                                    target_server = int(target_server)
+                                    if target_server in number_server_crossref.keys():
+                                        target_server = number_server_crossref[target_server]
+                                    else:
+                                        print(f"{colours['red']}Invalid server ID. Please try again.{colours['reset']}")
+                                        continue
 
-                            root_user.start_server(name_id=target_server)
+                                target_server = thorns.get_idtype_target(target_server, 'suid')
 
+                                cmd_pipe = root_user.start_server(identifier=target_server)
+                                # Save to shared dict for API and other places to access.
+                                shared_dict[target_server] = {}
+                                shared_dict[target_server]['cmd_pipe'] = cmd_pipe
+
+                                run_success = True
+                                break
+                            else:
+                                print(f"{colours['yellow']}No servers found. Please create a server first using 'server create'{colours['reset']}")
+                                run_success = True
+                                break
                 elif cmd == 'sessions':
                     if len(args) == 0:
                         print('Invalid usage. Usage: sessions <command>')
@@ -360,54 +412,25 @@ class rose:
             rose.shutdown()
 
     def ask_question(
-            question:str,
-            options:list=None,
-            exit_phrase='exit',
-            confirm_validity=True,
-            show_default=True,
-            default=None,
-            filter_func=None,
-            colour='green',
-            do_listing:bool=False
-            ) -> str:
-        """
-        Prompts the user with a question and returns their response.
-
-        This function will keep asking the question until a valid response is given.
-        A response is considered valid if it is included in the options list (if provided)
-        and if it passes the filter function (if provided).
-
-        :param question: (str) The question to ask the user.
-        :param options: (list, optional) A list of valid responses. If None, all responses are considered valid. Defaults to None.
-        :param exit_phrase: (str, optional) A phrase that, if inputted, will raise an 'exited_question' error. Defaults to 'exit'.
-        :param confirm_validity: If True, the user will be asked to confirm their response.
-        :param show_default: If True, the default value will be shown in the prompt.
-        :param default: (any, optional) A default value to return if a KeyboardInterrupt is raised. Defaults to None.
-        :param filter_func: (callable, optional) A function that takes the user's response as input and returns a boolean
-        :param colour: (str, optional) The colour of the prompt. Defaults to 'green'.
-        :param do_listing: (bool, optional) If True, the user must input a list of responses. Defaults to False.
-
-        example filter_func:
-
-        >>> def filter_func(question_answer):
-        >>>     return question_answer >= 0
-
-        Lambda functions can also be used.
-
-        Returns:
-        str: The user's response.
-
-        Raises:
-        error.exited_question: If the user inputs the 'exit_phrase'.
-        """
+        question:str,
+        options:list=None,
+        exit_phrase='exit',
+        confirm_validity=True,
+        show_default=True,
+        default=None,
+        filter_func=None,
+        colour='green',
+        do_listing:bool=False,
+        allow_default:bool=True,
+        show_options:bool=True
+    ) -> str:
         assert do_listing in [True, False], "Do_listing must be a boolean."
         try:
-            answers_list = [] # Not used unless get_type is list.
+            answers_list = []
             while True:
-                print(question if not show_default else f"{question} || Default: {default}")
+                print(question if not show_default else f"{question} (Default: {default})")
                 if do_listing is True:
                     print("(Type 'done' to finish giving answers)")
-                    # Gets an answer, tells user how many answers they have given.
                     response = input(f"({len(answers_list)}) {colours[colour]}>>> {colours['reset']}")
                     if response == '':
                         print(f"{colours['red']}Error: Invalid response. Cannot choose default for lists.{colours['reset']}")
@@ -426,15 +449,20 @@ class rose:
                         if retry not in ['y', 'yes']:
                             raise error.exited_question
 
+                    if response == 'done':
+                        if len(answers_list) == 0:
+                            return []
+                        break
                     answers_list.append(response)
-                    if response != 'done':
-                        continue
                 else:
+                    if show_options:
+                        if options is not None:
+                            print(f"Options: {', '.join(options)}")
                     response = input(f"{colours[colour]}>>> {colours['reset']}")
 
                 if exit_phrase == response:
                     raise error.exited_question
-                elif response == '':
+                elif response == '' and allow_default is True:
                     response = default
 
                 if options is not None:
@@ -463,7 +491,7 @@ class rose:
                     if valid not in ['y', 'yes']:
                         continue
 
-                return response
+                return response if not do_listing else answers_list
         except KeyboardInterrupt:
             return default
 
@@ -679,11 +707,19 @@ class rose:
 
         # Create the first account
         ROOT_USER = dt.ACCOUNT
-        ROOT_USER['permissions'] = security.perms.parse_for_file([security.perms.ADMINISTRATOR])
         ROOT_USER['email_address'] = email_address
         ROOT_USER['password'] = admin_password
 
         var.set(f'accounts//{email_address}', ROOT_USER)
+
+        # Gives root user root permissions
+        perms.set(
+            effects_email=email_address,
+            causes_email='RosePanel',
+            permission=perms.ADMINISTRATOR,
+            value=True
+        )
+
         print(f"{colours['green']}Admin account created.{colours['reset']}")
         print("\nTo login, enter the following details to the web panel when it is ready:")
         print(f"{colours['yellow']}Email: {email_address}")
@@ -697,12 +733,16 @@ class rose:
         print("Thank you for choosing RosePanel!")
         time.sleep(4)
 
+        var.set("working_directory", os.getcwd(), file=settings_path)
+
         var.set('first_start', False)
         return True
 
 if __name__ == "__main__":
     if var.get('first_start'):
         rose.welcome_cli()
+
+    shared_dict = multiprocessing.Manager().dict()
 
     ROSE_GUI = multiprocessing.Process(
         target=webserver.main,
@@ -713,7 +753,8 @@ if __name__ == "__main__":
 
     ROSE_API = multiprocessing.Process(
         target=rose_api.run,
-        name="roseapi"
+        name="roseapi",
+        args=(shared_dict,)
     )
     ROSE_API.start()
 
@@ -740,4 +781,22 @@ if __name__ == "__main__":
     time.sleep(1.5) # Wait for the webserver to start.
 
     if os.environ.get('DO_CLI', True) is True:
+        if os.getcwd() != var.get('working_directory'):
+            logging.warning("The working directory has changed.")
+            handling = rose.ask_question(
+                "The working directory has changed. Please select how you'd like to handle this",
+                options=['change to normal directory', 'exit rosepanel', 'continue regardless', 'set current as new'],
+            )
+            if handling == 'change to normal directory':
+                os.chdir(var.get('working_directory'))
+                logging.warning("Changed the working directory back to the original.")
+            elif handling == 'exit rosepanel':
+                logging.warning("User chose to exit RosePanel.")
+                rose.shutdown()
+            elif handling == 'set current as new.':
+                var.set('working_directory', os.getcwd(), file=settings_path)
+                logging.warning("Changed the working directory to the current directory.")
+            else:
+                print("Continuing regardless of the working directory change.")
+                logging.warning("User chose to continue regardless of the working directory change.")
         rose.cli()

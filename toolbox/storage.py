@@ -1,9 +1,11 @@
 from toolbox.pylog import pylog
+import inspect
 import json
 import os
 
 logging = pylog(os.path.abspath("logs/rose_%TIMENOW%.log"))
 
+DEBUG = os.environ.get('DEBUG', False)
 memory_file = 'memory.json'
 settings_path = 'settings.json'
 # The seperator used to split keys in the var class when you access like 'key1//key2//key3'
@@ -25,6 +27,7 @@ class dt:
         'first_start': True,
         'token_lifespan': 3600 * 4,  # 4 hours
         'ask_to_exit': True,
+        'working_directory': None, # path to the expected working directory
         'one_token_accounts': True,
         'hostname': '0.0.0.0',
         'ports': {
@@ -45,6 +48,7 @@ class dt:
     SERVER_INSTANCE = {
         'owner': None,
         'identifier': None,
+        'server_unique_id': None,
         'description': None,
         'hostname': None,
         'port': None,
@@ -53,7 +57,6 @@ class dt:
         'kill_signal': 2, # Default is SIGINT. Might be a string or an int.
         'online': False,
         'process_pid': None,
-        'worker_pid': None,
         'content_dir': None,
         'resources': {
             'RAM': {'used': 0, 'total': None},
@@ -73,6 +76,10 @@ class var:
         :param dt_default: The default dictionary to fill a json file with if the file does not exist.
         :return:
         '''
+        # Logs the file it creates, and which file and line called it.
+        if DEBUG is True:
+            logging.info(f'file \'{file}\' was set by {inspect.stack()[1].filename}:{inspect.stack()[1].lineno}')
+
         keys = str(key).split(key_seperator)
         file_dir = os.path.dirname(file)
         if file_dir == '':
@@ -109,6 +116,10 @@ class var:
         :param file: The file to get the key from.
         Set to None if you want to raise an error if the file does not exist.
         '''
+        # Logs the file it creates, and which file and line called it.
+        if DEBUG is True:
+            logging.info(f'file \'{file}\' was retrieved from by {inspect.stack()[1].filename}:{inspect.stack()[1].lineno}')
+
         keys = str(key).split(key_seperator)
         file_dir = os.path.dirname(file)
         if file_dir == '':
@@ -148,6 +159,10 @@ class var:
         :param file: The file to delete the key from.
         :param default: The default dictionary to fill a json file with if the file does not exist.
         '''
+        # Logs the file it creates, and which file and line called it.
+        if DEBUG is True:
+            logging.info(f'file \'{file}\' was had a key deleted by {inspect.stack()[1].filename}:{inspect.stack()[1].lineno}')
+
         keys = str(key).split(key_seperator)
         file_dir = os.path.dirname(file)
         if file_dir == '':
@@ -188,6 +203,10 @@ class var:
         :param dt_default:
         :return:
         '''
+        # Logs the file it creates, and which file and line called it.
+        if DEBUG is True:
+            logging.info(f'file \'{file}\' was fully loaded by {inspect.stack()[1].filename}:{inspect.stack()[1].lineno}')
+
         os.makedirs(os.path.dirname(file), exist_ok=True)
         if not os.path.exists(file):
             with open(file, 'w+') as f:
@@ -204,6 +223,10 @@ class var:
         :param file: The file to fill with data.
         :param data: The data to fill the file with.
         '''
+        # Logs the file it creates, and which file and line called it.
+        if DEBUG is True:
+            logging.info(f'file \'{file}\' was filled with data by {inspect.stack()[1].filename}:{inspect.stack()[1].lineno}')
+
         os.makedirs(os.path.dirname(file), exist_ok=True)
         with open(file, 'w+') as f:
             json.dump(data, f, indent=4, separators=(',', ':'))
